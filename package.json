@@ -1,0 +1,58 @@
+{
+  "name": "@flexops/cli",
+  "version": "0.1.0",
+  "description": "Command-line companion for the FlexOps Gateway API. Issue sandbox keys, create labels, and track shipments without leaving the terminal.",
+  "license": "MIT",
+  "author": "FlexOps, LLC",
+  "homepage": "https://flexops.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BillEisenman/flexops-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BillEisenman/flexops-cli/issues"
+  },
+  "keywords": [
+    "flexops",
+    "shipping",
+    "cli",
+    "usps",
+    "ups",
+    "fedex",
+    "dhl",
+    "labels",
+    "tracking",
+    "sandbox"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "flexops": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --target node18 --clean --shims",
+    "dev": "tsup src/index.ts --format esm --target node18 --shims --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "kleur": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsup": "^8.2.4",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
