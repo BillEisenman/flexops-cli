@@ -1,6 +1,6 @@
 {
   "name": "@flexops/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Command-line companion for the FlexOps Gateway API. Issue sandbox keys, create labels, and track shipments without leaving the terminal.",
   "license": "MIT",
   "author": "FlexOps, LLC",
