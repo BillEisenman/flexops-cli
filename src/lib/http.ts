@@ -8,6 +8,8 @@
  * shipping work; encoding the right header here keeps every command honest.
  */
 
+import { CLI_VERSION } from "../version.js";
+
 export interface GatewayRequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   apiKey?: string;
@@ -45,7 +47,7 @@ export async function gatewayFetch<T = unknown>(
 
   const headers: Record<string, string> = {
     Accept: "application/json",
-    "User-Agent": "flexops-cli/0.1.0",
+    "User-Agent": `flexops-cli/${CLI_VERSION}`,
   };
   if (apiKey) headers["X-API-Key"] = apiKey;
   if (body !== undefined) headers["Content-Type"] = "application/json";
