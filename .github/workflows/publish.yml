@@ -1,0 +1,57 @@
+name: Publish to npm
+
+# Publishes @flexops/cli to registry.npmjs.org via npm trusted publishing
+# (OIDC) — no stored token, no MFA prompt. Triggered on a vX.Y.Z tag push or
+# manual workflow_dispatch. Mirrors the flexops-sdk-node publish workflow.
+#
+# One-time setup on npmjs.com (REQUIRED before the first successful run):
+#   1. npmjs.com -> package @flexops/cli -> Settings -> Trusted Publishers
+#   2. Add a GitHub Actions trusted publisher:
+#        Organization or user: BillEisenman
+#        Repository:           flexops-cli
+#        Workflow filename:    publish.yml
+#        Environment:          (leave blank)
+#   Until configured, `npm publish` returns HTTP 404 (npm reports an
+#   unauthorized publish as 404, not 403).
+#
+# Release flow: bump "version" in package.json, commit, then
+#   git tag vX.Y.Z && git push origin vX.Y.Z   (or run this workflow manually)
+#
+# Docs: https://docs.npmjs.com/trusted-publishers
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # required to mint the OIDC token GitHub -> npm exchanges
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      # OIDC trusted publishing needs npm CLI 11.5+; node 20 ships an older npm.
+      - name: Ensure npm supports OIDC publishing
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish (OIDC trusted publisher)
+        run: npm publish --access public --provenance
