@@ -1,0 +1,47 @@
+name: CI
+
+# Builds, typechecks and tests on every push and pull request.
+#
+# Until this existed the only workflow here was publish.yml, which runs on tag
+# push — so the first thing to exercise a change was a release. That is the
+# worst moment to discover a break. In the sibling flexops-sdk-elements repo a
+# dependency bump left the package unable to build while all of its tests
+# passed, because Vitest never touches the bundler. `npm run build` is the step
+# that catches bundler and dependency breaks, so it runs before the tests.
+#
+# Node 20 matches publish.yml, so CI exercises what actually publishes.
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Build, typecheck, test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
