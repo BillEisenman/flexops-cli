@@ -23,7 +23,7 @@ describe("resolveConfig", () => {
 
   it("defaults to the production Gateway URL when no flag or env is set", () => {
     const cmd = makeCommand();
-    cmd.parse(["node", "flexops"], { from: "user" });
+    cmd.parse([], { from: "user" });
     const cfg = resolveConfig(cmd, cmd.opts());
     expect(cfg.gatewayUrl).toBe(DEFAULT_GATEWAY_URL);
   });
@@ -31,14 +31,14 @@ describe("resolveConfig", () => {
   it("prefers --gateway-url over the env var", () => {
     process.env["FLEXOPS_GATEWAY_URL"] = "https://env.example";
     const cmd = makeCommand();
-    cmd.parse(["node", "flexops", "--gateway-url", "https://flag.example"], { from: "user" });
+    cmd.parse(["--gateway-url", "https://flag.example"], { from: "user" });
     const cfg = resolveConfig(cmd, cmd.opts());
     expect(cfg.gatewayUrl).toBe("https://flag.example");
   });
 
   it("trims trailing slashes from the resolved Gateway URL", () => {
     const cmd = makeCommand();
-    cmd.parse(["node", "flexops", "--gateway-url", "https://gw.example///"], { from: "user" });
+    cmd.parse(["--gateway-url", "https://gw.example///"], { from: "user" });
     const cfg = resolveConfig(cmd, cmd.opts());
     expect(cfg.gatewayUrl).toBe("https://gw.example");
   });
@@ -46,14 +46,14 @@ describe("resolveConfig", () => {
   it("falls back to FLEXOPS_API_KEY when --key is absent", () => {
     process.env["FLEXOPS_API_KEY"] = "test_fromenv";
     const cmd = makeCommand();
-    cmd.parse(["node", "flexops"], { from: "user" });
+    cmd.parse([], { from: "user" });
     const cfg = resolveConfig(cmd, cmd.opts());
     expect(cfg.apiKey).toBe("test_fromenv");
   });
 
   it("emits json=true when --json is set", () => {
     const cmd = makeCommand();
-    cmd.parse(["node", "flexops", "--json"], { from: "user" });
+    cmd.parse(["--json"], { from: "user" });
     const cfg = resolveConfig(cmd, cmd.opts());
     expect(cfg.json).toBe(true);
   });
