@@ -1,0 +1,34 @@
+# Batches dependency updates instead of taking them purely reactively.
+#
+# Without this file the repo gets GitHub's default security-only PRs, which
+# arrive one batch at a time and cascade: merging one lockfile PR causes
+# Dependabot to re-resolve and open the next. Six were hand-verified across
+# these SDK repos in a single afternoon.
+#
+# Weekly + grouped means one PR to review per ecosystem per week, which CI
+# checks and (for lockfile-only updates) dependabot-auto-merge.yml lands
+# without a human.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-dependencies:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - '*'

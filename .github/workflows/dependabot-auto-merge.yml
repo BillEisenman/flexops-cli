@@ -1,0 +1,61 @@
+name: Dependabot auto-merge
+
+# Merges a Dependabot PR once CI has actually passed — and only when the PR is
+# lockfile-only.
+#
+# Why it triggers on workflow_run rather than pull_request:
+#   `gh pr merge --auto` only WAITS for checks that branch protection marks as
+#   required. This repo has no branch protection and allow_auto_merge is off, so
+#   --auto would merge immediately, before CI said anything. Reacting to CI's
+#   own completion is self-contained: no repo settings, and it structurally
+#   cannot merge ahead of the gate.
+#
+# Why lockfile-only rather than semver patch/minor:
+#   A "security group" PR is not necessarily a small one. flexops-sdk-elements#3
+#   was labelled as a grouped security update and carried vite ^6 -> ^8 plus
+#   @vitejs/plugin-react ^4 -> ^6, which left the package unable to build. What
+#   distinguished it was that it edited package.json ranges. Every update that
+#   proved safe touched package-lock.json alone. So: lockfile-only lands
+#   automatically, anything reaching into package.json waits for a human.
+
+on:
+  workflow_run:
+    workflows: [ 'CI' ]
+    types: [ completed ]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Merge if the PR is lockfile-only
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          pr=$(jq -r '.workflow_run.pull_requests[0].number // empty' "$GITHUB_EVENT_PATH")
+          if [ -z "$pr" ]; then
+            echo "No pull request attached to this run; nothing to merge."
+            exit 0
+          fi
+
+          files=$(gh pr view "$pr" --repo "$REPO" --json files --jq '.files[].path')
+          echo "PR #$pr changes:"; echo "$files"
+
+          if [ -n "$(printf '%s\n' "$files" | grep -v '^package-lock\.json$' || true)" ]; then
+            echo "::notice::PR #$pr touches files beyond package-lock.json — leaving it for review."
+            exit 0
+          fi
+
+          echo "Lockfile-only and CI green — merging PR #$pr."
+          gh pr merge "$pr" --repo "$REPO" --squash --delete-branch
