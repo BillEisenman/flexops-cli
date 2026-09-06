@@ -90,6 +90,22 @@ Codex's native MCP HTTP header configuration is connection-level; its header hel
 
 `npm test` builds the CLI and runs separate-process synthetic HTTP checks for approval, cancellation, unique operation keys, lost-response replay, changed-input rejection, stale previews and reconciliation. This proves the CLI transport lifecycle; native Codex MCP writes and autonomous human-consent handling remain uncertified.
 
+### Private ChatGPT connector (v0.3.0)
+
+`flexops inventory-mcp` exposes four stdio MCP tools: preview, inspect, commit and cancel. It reuses the inventory workflow above; it does not accept arbitrary Gateway requests, credentials, operation-directory paths or reconciliation instructions from tool arguments. Commit requires `approved: true` and advertises destructive, idempotent write annotations. The host must still obtain explicit approval of the displayed preview. Inspection never retries a write.
+
+For a private ChatGPT connection, use OpenAI's [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) and [official tunnel client](https://github.com/openai/tunnel-client/releases/latest). Create a tunnel associated with the intended ChatGPT workspace. Supply its runtime key through `CONTROL_PLANE_API_KEY`, and the narrowly entitled FlexOps key through `FLEXOPS_API_KEY`; keep both out of command arguments and source files. Configure the tunnel's stdio command to run `node` with the absolute installed CLI entrypoint and `inventory-mcp`.
+
+```powershell
+tunnel-client init --sample sample_mcp_stdio_local --profile flexops-inventory --tunnel-id YOUR_TUNNEL_ID --mcp-command 'node "D:/path/to/flexops-cli/dist/index.js" inventory-mcp'
+tunnel-client doctor --profile flexops-inventory --explain
+tunnel-client run --profile flexops-inventory
+```
+
+Keep the host running, then create a private developer-mode MCP connection in ChatGPT, choose **Tunnel**, and select that tunnel. Do not publish this single-identity adapter to a public plugin directory or share tunnel access beyond the operator authorized to use its FlexOps key. Everyone allowed through the tunnel acts as that configured identity; per-user OAuth is not implemented here.
+
+The local transport tests pass; actual ChatGPT discovery, confirmation UI and end-to-end writes must be verified in the target account before claiming ChatGPT certification. Start with synthetic records, decline one preview, approve another, and verify its authoritative inventory/action records. On any uncertain result, stop and reconcile from the terminal using the original operation ID.
+
 ## Global flags
 
 - `--gateway-url <url>` — point the CLI at a non-production Gateway (e.g. local dev). Also reads `FLEXOPS_GATEWAY_URL`.

@@ -121,6 +121,17 @@ export function cancelInventory(id: string, store = root()) {
   return { operation: id, status: "Cancelled" };
 }
 
+export function inspectInventory(config: ResolvedConfig, id: string, store = root()) {
+  const { key, gateway } = credentials(config);
+  const dir = directory(id, store);
+  const saved: Operation = JSON.parse(readFileSync(join(dir, "operation.json"), "utf8"));
+  if (saved.gateway !== gateway || saved.keyHash !== hash(key)) throw new Error("Use the original Gateway and API key for this operation.");
+  const decision = existsSync(join(dir, "decision.json")) ? JSON.parse(readFileSync(join(dir, "decision.json"), "utf8")) : null;
+  const outcome = ["result.json", "rejected.json", "blocked.json"].find(file => existsSync(join(dir, file)));
+  return { operation: id, preview: saved.preview, status: outcome ? JSON.parse(readFileSync(join(dir, outcome), "utf8")).status
+    : decision?.cancelled ? "Cancelled" : decision ? "ApprovedUnresolved" : "AwaitingApproval" };
+}
+
 export function registerInventoryCommand(program: Command) {
   const inventory = program.command("inventory").description("Persisted, approval-gated inventory adjustments over MCP HTTP.");
   inventory.command("preview").requiredOption("--sku <sku>").requiredOption("--warehouse <id>")
