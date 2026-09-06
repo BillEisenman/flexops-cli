@@ -1,6 +1,6 @@
 {
   "name": "@flexops/cli",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Command-line companion for the FlexOps Gateway API. Issue sandbox keys, create labels, and track shipments without leaving the terminal.",
   "license": "MIT",
   "author": "FlexOps, LLC",
@@ -41,6 +41,7 @@
     "build": "tsup src/index.ts --format esm --target node18 --clean --shims",
     "dev": "tsup src/index.ts --format esm --target node18 --shims --watch",
     "typecheck": "tsc --noEmit",
+    "pretest": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"

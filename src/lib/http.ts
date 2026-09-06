@@ -16,6 +16,7 @@ export interface GatewayRequestOptions {
   body?: unknown;
   timeoutMs?: number;
   signal?: AbortSignal;
+  idempotencyKey?: string;
 }
 
 export class GatewayError extends Error {
@@ -50,6 +51,7 @@ export async function gatewayFetch<T = unknown>(
     "User-Agent": `flexops-cli/${CLI_VERSION}`,
   };
   if (apiKey) headers["X-API-Key"] = apiKey;
+  if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
   let response: Response;
@@ -59,6 +61,7 @@ export async function gatewayFetch<T = unknown>(
       headers,
       body: body === undefined ? null : JSON.stringify(body),
       signal: controller.signal,
+      redirect: "error",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

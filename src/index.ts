@@ -2,15 +2,15 @@
 /**
  * @flexops/cli — command-line companion for the FlexOps Gateway API.
  *
- * Sandbox-first by design: every command works against a `test_`-prefixed
- * API key with mock carriers and no real charges. Production keys swap in
- * via --key or FLEXOPS_API_KEY without changing any other flag.
+ * Shipping commands support sandbox keys; inventory writes require a live key
+ * and a persisted preview/approval workflow.
  */
 import { Command } from "commander";
 import { registerSandboxCommand } from "./commands/sandbox.js";
 import { registerLabelsCommand } from "./commands/labels.js";
 import { registerTrackCommand } from "./commands/track.js";
 import { CLI_VERSION } from "./version.js";
+import { registerInventoryCommand } from "./commands/inventory.js";
 
 const program = new Command();
 
@@ -33,6 +33,7 @@ program
 registerSandboxCommand(program);
 registerLabelsCommand(program);
 registerTrackCommand(program);
+registerInventoryCommand(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   const message = err instanceof Error ? err.message : String(err);

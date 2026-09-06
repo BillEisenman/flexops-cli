@@ -31,7 +31,7 @@ The CLI talks to the Gateway with `X-API-Key` (not `Authorization: Bearer` — t
 
 Three ways to supply a key, evaluated in this order:
 
-1. `--key <key>` on the command line.
+1. `--key <key>` on shipping commands.
 2. `FLEXOPS_API_KEY` environment variable.
 3. (`sandbox` command only) no key required — it issues one.
 
@@ -64,6 +64,31 @@ Creates a shipment label via `POST /api/v1/shipping/labels`. Flags map to the `L
 ### `flexops track <trackingNumber>`
 
 GETs `/api/v1/shipping/track/{trackingNumber}` and prints the latest status, location, carrier, ETA, plus the five most recent events.
+
+### Inventory workflow for Codex (v0.2.0)
+
+Install `@flexops/cli@0.2.0` and use `flexops inventory`, or build this checkout with `npm run build` and run `node dist/index.js` as below. Set `FLEXOPS_API_KEY` securely in the process environment to an entitled `live_` key with `inventory:write`, the Inventory module and `inventory.basic-adjustments`; sandbox keys cannot perform these writes. Use synthetic records in a controlled environment for certification.
+
+```powershell
+# Inspect the returned operation UUID, quantities, policy and expiry.
+node dist/index.js inventory preview --sku CERT-SKU --warehouse 7 --quantity 2 --reason "Synthetic certification"
+# After the user explicitly approves that exact displayed preview:
+node dist/index.js inventory commit <operation-uuid> --approve
+# After a lost response or process restart, retry the same operation:
+node dist/index.js inventory commit <operation-uuid>
+# If the user declines before approval:
+node dist/index.js inventory cancel <operation-uuid>
+```
+
+Replace `<operation-uuid>` with the returned UUID. Inventory output is always JSON. Each preview creates a unique operation ID used as its `Idempotency-Key`; its exact signed commit request and approval are persisted before dispatch. A commit without approval only shows the saved preview. Completed operations return the saved result without another write. The original Gateway and API key must be retained for retries.
+
+Codex must show the preview and wait for explicit user approval before supplying `--approve`. This flag records the caller's approval assertion; it does not independently authenticate a human or prove that a model obtained consent. After `OutcomeUnknown` or another classified non-success, stop for operator investigation. Only after checking authoritative action and inventory records, use `inventory commit <operation-uuid> --reconcile` to replay the original request. This does not repair server records. After a definitive precondition rejection, create a new preview and obtain new approval. Never replace an unresolved operation with a new key.
+
+The private operation directory defaults to `~/.flexops/operations` (`FLEXOPS_OPERATION_DIR` overrides it). Records contain signed confirmation tokens and audit reasons, but no API key. Do not edit, delete, commit or share them; keep them across restarts. Unix creation modes are restricted; Windows uses inherited ACLs, so use a private user directory or provision equivalent ACLs for an override. Local records are a trusted boundary, not tamper-proof audit storage. The unresolved-operation scan covers this directory and the original credential identity; the server owns cross-client concurrency and durable reconciliation.
+
+Codex's native MCP HTTP header configuration is connection-level; its header helper is cached per connection ([official configuration reference](https://developers.openai.com/codex/config-reference/)). Use this CLI route for inventory adjustments instead of a static `Idempotency-Key`. If also connecting native MCP for reads, disable `adjust_inventory` there with `disabled_tools = ["adjust_inventory"]`; other fulfillment writes also require a suitable per-operation client. No native connector or global Codex configuration is changed by this CLI.
+
+`npm test` builds the CLI and runs separate-process synthetic HTTP checks for approval, cancellation, unique operation keys, lost-response replay, changed-input rejection, stale previews and reconciliation. This proves the CLI transport lifecycle; native Codex MCP writes and autonomous human-consent handling remain uncertified.
 
 ## Global flags
 
