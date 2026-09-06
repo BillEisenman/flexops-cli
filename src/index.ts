@@ -11,6 +11,7 @@ import { registerLabelsCommand } from "./commands/labels.js";
 import { registerTrackCommand } from "./commands/track.js";
 import { CLI_VERSION } from "./version.js";
 import { registerInventoryCommand } from "./commands/inventory.js";
+import { registerInventoryMcpCommand } from "./commands/inventory-mcp.js";
 
 const program = new Command();
 
@@ -34,6 +35,7 @@ registerSandboxCommand(program);
 registerLabelsCommand(program);
 registerTrackCommand(program);
 registerInventoryCommand(program);
+registerInventoryMcpCommand(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   const message = err instanceof Error ? err.message : String(err);

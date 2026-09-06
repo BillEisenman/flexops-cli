@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { createInterface } from "node:readline";
+import { once } from "node:events";
 import { promisify } from "node:util";
 import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -61,6 +63,58 @@ async function cli(...args: string[]) {
   return JSON.parse(result.stdout);
 }
 const preview = () => cli("preview", "--sku", "CERT-SKU", "--warehouse", "7", "--quantity", "2", "--reason", "Synthetic certification");
+
+it("exposes approval-gated MCP tools and preserves retry state across connector restarts", async () => {
+  function connect() {
+    const child = spawn(process.execPath, [resolve("dist/index.js"), "--gateway-url", url, "inventory-mcp"], {
+      env: { ...process.env, FLEXOPS_API_KEY: "live_synthetic_local_only", FLEXOPS_OPERATION_DIR: store }, stdio: ["pipe", "pipe", "pipe"],
+    });
+    const lines = createInterface({ input: child.stdout });
+    let id = 0;
+    return {
+      async request(method: string, params: unknown = {}) {
+        const next = once(lines, "line");
+        child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }) + "\n");
+        return JSON.parse((await next)[0]);
+      },
+      async close() { const closed = once(child, "close"); child.stdin.end(); await closed; lines.close(); },
+    };
+  }
+  let client = connect();
+  const invoke = (name: string, args: unknown) => client.request("tools/call", { name, arguments: args });
+  try {
+    expect((await client.request("tools/list")).error.message).toBe("Initialize first.");
+    const init = await client.request("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "synthetic-cert", version: "1" } });
+    expect(init.result.protocolVersion).toBe("2025-11-25");
+    const discovered = (await client.request("tools/list")).result.tools;
+    expect(discovered).toHaveLength(4);
+    expect(discovered.find((t: any) => t.name === "commit_inventory_adjustment").annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, idempotentHint: true });
+    const prepared = await invoke("preview_inventory_adjustment", { sku: "CERT-SKU", warehouse_id: 7, quantity_change: 2, reason: "MCP certification" });
+    const operation = prepared.result.structuredContent.operation;
+    expect(JSON.stringify(prepared)).not.toContain("synthetic-signed-token");
+    expect((await invoke("commit_inventory_adjustment", { operation })).result.isError).toBe(true);
+    expect((await invoke("commit_inventory_adjustment", { operation, approved: false })).result.isError).toBe(true);
+    expect(writes).toBe(0);
+    loseResponse = true;
+    expect((await invoke("commit_inventory_adjustment", { operation, approved: true })).result.isError).toBe(true);
+    expect(writes).toBe(1);
+    const count = calls.length;
+    expect((await invoke("inspect_inventory_adjustment", { operation })).result.structuredContent.status).toBe("ApprovedUnresolved");
+    expect(calls).toHaveLength(count);
+    await client.close(); client = connect();
+    await client.request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "synthetic-cert", version: "1" } });
+    const retry = await invoke("commit_inventory_adjustment", { operation, approved: true });
+    expect(retry.result.structuredContent.replayed).toBe(true);
+    expect(calls[1]).toEqual(calls[2]);
+    expect(writes).toBe(1);
+    expect((await invoke("commit_inventory_adjustment", { operation, approved: true, reconcile: true })).result.isError).toBe(true);
+    expect((await invoke("reconcile_inventory_adjustment", { operation })).result.isError).toBe(true);
+    const next = (await invoke("preview_inventory_adjustment", { sku: "CERT-SKU", warehouse_id: 7, quantity_change: 2, reason: "Cancel me" })).result.structuredContent;
+    await invoke("cancel_inventory_adjustment", { operation: next.operation });
+    expect((await invoke("commit_inventory_adjustment", { operation: next.operation, approved: true })).result.isError).toBe(true);
+    expect(writes).toBe(1);
+  } finally { await client.close(); }
+});
 
 it("rejects a changed identity or saved approved request without dispatch", async () => {
   const operation = await preview();
