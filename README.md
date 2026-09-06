@@ -88,7 +88,7 @@ The private operation directory defaults to `~/.flexops/operations` (`FLEXOPS_OP
 
 Codex's native MCP HTTP header configuration is connection-level; its header helper is cached per connection ([official configuration reference](https://developers.openai.com/codex/config-reference/)). Use this CLI route for inventory adjustments instead of a static `Idempotency-Key`. If also connecting native MCP for reads, disable `adjust_inventory` there with `disabled_tools = ["adjust_inventory"]`; other fulfillment writes also require a suitable per-operation client. No native connector or global Codex configuration is changed by this CLI.
 
-`npm test` builds the CLI and runs separate-process synthetic HTTP checks for approval, cancellation, unique operation keys, lost-response replay, changed-input rejection, stale previews and reconciliation. This proves the CLI transport lifecycle; native Codex MCP writes and autonomous human-consent handling remain uncertified.
+`npm test` builds the CLI and runs separate-process synthetic HTTP checks for approval, cancellation, unique operation keys, lost-response replay, changed-input rejection, stale previews and reconciliation. From 0.3.1, locally completed operations return `replayed: true` and `cached: true` with the original action ID, without another Gateway request. This proves the CLI transport lifecycle; native Codex MCP writes and autonomous human-consent handling remain uncertified.
 
 ### Private ChatGPT connector (v0.3.0)
 

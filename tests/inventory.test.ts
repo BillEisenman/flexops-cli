@@ -107,6 +107,10 @@ it("exposes approval-gated MCP tools and preserves retry state across connector 
     expect(retry.result.structuredContent.replayed).toBe(true);
     expect(calls[1]).toEqual(calls[2]);
     expect(writes).toBe(1);
+    const beforeCached = calls.length;
+    const cached = await invoke("commit_inventory_adjustment", { operation, approved: true });
+    expect(cached.result.structuredContent).toMatchObject({ replayed: true, cached: true, actionId: retry.result.structuredContent.actionId });
+    expect(calls).toHaveLength(beforeCached);
     expect((await invoke("commit_inventory_adjustment", { operation, approved: true, reconcile: true })).result.isError).toBe(true);
     expect((await invoke("reconcile_inventory_adjustment", { operation })).result.isError).toBe(true);
     const next = (await invoke("preview_inventory_adjustment", { sku: "CERT-SKU", warehouse_id: 7, quantity_change: 2, reason: "Cancel me" })).result.structuredContent;
@@ -154,7 +158,7 @@ it("persists approval and the exact request through a lost response and process 
   expect(calls[1]).toEqual(calls[2]);
   expect(stock).toBe(12);
   const count = calls.length;
-  await cli("commit", operation.operation);
+  expect(await cli("commit", operation.operation)).toMatchObject({ replayed: true, cached: true, actionId: retry.actionId });
   expect(calls).toHaveLength(count);
   const next = await preview();
   expect(next.operation).not.toBe(operation.operation);

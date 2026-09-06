@@ -100,7 +100,7 @@ export async function commitInventory(config: ResolvedConfig, id: string, approv
     try { record(decision, { approvedHash: hash(operation.body) }); } catch (error) { if (!existsSync(decision)) throw error; }
   }
   if (JSON.parse(readFileSync(decision, "utf8")).approvedHash !== hash(operation.body)) throw new Error("Operation cancelled or approved inputs changed. No commit is permitted.");
-  if (existsSync(join(dir, "result.json"))) return JSON.parse(readFileSync(join(dir, "result.json"), "utf8"));
+  if (existsSync(join(dir, "result.json"))) return { ...JSON.parse(readFileSync(join(dir, "result.json"), "utf8")), replayed: true, cached: true };
   if (existsSync(join(dir, "rejected.json"))) throw new Error("Definitive precondition rejection. Prepare a new preview and obtain new approval.");
   if (existsSync(join(dir, "blocked.json")) && !reconcile) throw new Error("Outcome requires operator reconciliation. Do not create a new operation. Use --reconcile only after checking authoritative server records.");
   // Persisted body and ID are the only source for every attempt, including after restart.
