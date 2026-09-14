@@ -51,7 +51,7 @@ POSTs to `/api/Sandbox/demo-keys` (no auth) and prints a freshly minted `test_` 
 
 ### `flexops labels create`
 
-Creates a shipment label via `POST /api/v1/shipping/labels`. Flags map to the `LabelRequest` DTO the Gateway expects:
+Previews live postage or creates a synthetic sandbox label via `POST /api/v1/shipping/labels`. Flags map to the `LabelRequest` DTO the Gateway expects:
 
 | Flag | Maps to | Default |
 |---|---|---|
@@ -140,3 +140,22 @@ flexops labels create --carrier USPS --service PRIORITY \
 ## License
 
 MIT © FlexOps, LLC
+
+### Live label approval and recovery
+
+Use these commands with Gateway's bounded approval contract, activating clients and Gateway together:
+
+```sh
+flexops labels create --maximum-postage 10.00 --key live_... --json
+# Review the returned operation ID, quote, USD maximum and expiry.
+flexops labels approve <operation-id>             # display saved preview; no first purchase
+flexops labels approve <operation-id> --approve   # explicit first approval
+# After a lost response, retry only the saved operation:
+flexops labels approve <operation-id>
+# Only before any approval:
+flexops labels cancel-preview <operation-id>
+```
+
+Supply real shipment fields rather than the sandbox demo defaults for live postage. The maximum excludes later carrier adjustments and separate fees. `approve` without `--approve` dispatches only if that exact saved operation was already approved. It never obtains a fresh token or key automatically. OutcomeUnknown requires operator reconciliation; do not create another operation. Identical shipments with existing operations are blocked locally until resolved; use saved-operation replay for successful purchases too.
+
+Label operations are stored in `~/.flexops/label-purchases` or `FLEXOPS_LABEL_OPERATION_DIR`. They contain private addresses and signed tokens, but no API key. Keep this directory private and retain it across restarts; Windows uses inherited ACLs. Do not edit or share the files. Use the same Gateway and API key. Sandbox `labels create` remains a one-step synthetic response.
