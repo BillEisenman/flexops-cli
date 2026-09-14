@@ -1,6 +1,7 @@
+import { record, directory } from "../lib/operation-store.js";
 import { Command } from "commander";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, readdirSync, existsSync, openSync, writeFileSync, fsyncSync, closeSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { resolveConfig, requireApiKey, type ResolvedConfig } from "../lib/config.js";
@@ -20,18 +21,6 @@ function credentials(config: ResolvedConfig) {
     throw new Error("Use an HTTPS Gateway origin (HTTP is permitted only on loopback).");
   }
   return { key, gateway: url.origin };
-}
-
-// Immutable records are flushed before dispatch. The server owns concurrency and replay;
-// local decision/result markers never authorize a different request or a fresh key.
-function record(path: string, value: unknown) {
-  const fd = openSync(path, "wx", 0o600);
-  try { writeFileSync(fd, JSON.stringify(value)); fsyncSync(fd); } finally { closeSync(fd); }
-}
-
-function directory(id: string, store: string) {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)) throw new Error("Invalid operation ID.");
-  return join(store, id);
 }
 
 async function call(gateway: string, key: string, id: string, body: string) {

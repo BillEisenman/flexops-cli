@@ -1,6 +1,7 @@
+import { prepareLabel, approveLabel, cancelLabelPreview } from "./label-purchase.js";
 import { Command } from "commander";
-import { resolveConfig, requireApiKey } from "../lib/config.js";
-import { gatewayFetch, GatewayError } from "../lib/http.js";
+import { resolveConfig } from "../lib/config.js";
+import { GatewayError } from "../lib/http.js";
 import { writeJson, writeStdout, writeSuccess, writeInfo, writeError, dim, bold } from "../lib/output.js";
 
 interface LabelResponse {
@@ -31,8 +32,8 @@ export function registerLabelsCommand(program: Command): void {
   labels
     .command("create")
     .description(
-      "Create a sandbox or production shipping label. Defaults match the homepage demo " +
-        "(USPS Priority, 78701 -> 97201) so a no-flag invocation succeeds end-to-end."
+      "Preview live postage or create a sandbox label. Defaults match the homepage demo " +
+        "(USPS Priority, 78701 -> 97201); live previews require --maximum-postage."
     )
     .option("--key <key>", "API key (defaults to FLEXOPS_API_KEY)")
     .option("--carrier <code>", "Carrier code (USPS, UPS, FEDEX, DHL)", "USPS")
@@ -49,6 +50,7 @@ export function registerLabelsCommand(program: Command): void {
     .option("--to-city <city>", "Destination city", "Portland")
     .option("--to-state <code>", "Destination state code", "OR")
     .option("--to-country <code>", "Destination country code (ISO-2)", "US")
+    .option("--maximum-postage <usd>", "Maximum authorized postage in USD; required for live preview")
     .option("--weight-oz <ounces>", "Package weight in ounces", "8")
     .option("--length-in <inches>", "Package length in inches", "10")
     .option("--width-in <inches>", "Package width in inches", "6")
@@ -56,7 +58,6 @@ export function registerLabelsCommand(program: Command): void {
     .action(async (opts: Record<string, unknown>, cmd: Command) => {
       const cfg = resolveConfig(cmd, opts);
       try {
-        const apiKey = requireApiKey(cfg);
         const payload = {
           carrierCode: String(opts["carrier"]),
           serviceCode: String(opts["service"]),
@@ -87,17 +88,19 @@ export function registerLabelsCommand(program: Command): void {
 
         if (!cfg.json) {
           writeInfo(
-            `Creating ${payload.carrierCode} ${payload.serviceCode} label ${dim(
+            `Preparing ${payload.carrierCode} ${payload.serviceCode} label ${dim(
               `${payload.origin.postalCode} -> ${payload.destination.postalCode}, ${payload.package.weight}${payload.package.weightUnit}`
             )}`
           );
         }
 
-        const response = await gatewayFetch<LabelResponse>(cfg.gatewayUrl, "/api/v1/shipping/labels", {
-          method: "POST",
-          apiKey,
-          body: payload,
-        });
+        const response = await prepareLabel(cfg, payload, opts["maximumPostage"] === undefined ? undefined : parsePositiveNumber("maximum-postage", opts["maximumPostage"] as string));
+        if ("operation" in response) {
+          writeJson(response);
+          if (!cfg.json) writeInfo(`Review the quote, then run: flexops labels approve ${response.operation} --approve. Carrier adjustments and separate fees are outside the maximum.`);
+          return;
+        }
+        const label = response as LabelResponse;
 
         if (cfg.json) {
           writeJson(response);
@@ -106,18 +109,18 @@ export function registerLabelsCommand(program: Command): void {
 
         writeSuccess("Label created.");
         writeStdout("");
-        if (response.trackingNumber) writeStdout(`  Tracking number: ${bold(response.trackingNumber)}`);
-        if (response.carrierCode || response.serviceCode) {
-          writeStdout(`  Carrier / service: ${dim(`${response.carrierCode ?? "?"} ${response.serviceCode ?? ""}`.trim())}`);
+        if (label.trackingNumber) writeStdout(`  Tracking number: ${bold(label.trackingNumber)}`);
+        if (label.carrierCode || label.serviceCode) {
+          writeStdout(`  Carrier / service: ${dim(`${label.carrierCode ?? "?"} ${label.serviceCode ?? ""}`.trim())}`);
         }
-        if (typeof response.rate === "number") {
-          writeStdout(`  Rate: ${dim(`${response.rate.toFixed(2)} ${response.currency ?? "USD"}`)}`);
+        if (typeof label.rate === "number") {
+          writeStdout(`  Rate: ${dim(`${label.rate.toFixed(2)} ${label.currency ?? "USD"}`)}`);
         }
-        if (response.labelUrl) writeStdout(`  Label URL: ${response.labelUrl}`);
-        if (response.labelData) writeStdout(`  Label data: ${dim("(base64 PDF, omit with --json for the raw bytes)")}`);
-        if (response.trackingNumber) {
+        if (label.labelUrl) writeStdout(`  Label URL: ${label.labelUrl}`);
+        if (label.labelData) writeStdout(`  Label data: ${dim("(base64 PDF, omit with --json for the raw bytes)")}`);
+        if (label.trackingNumber) {
           writeStdout("");
-          writeInfo(`Track it: ${dim(`flexops track ${response.trackingNumber}`)}`);
+          writeInfo(`Track it: ${dim(`flexops track ${label.trackingNumber}`)}`);
         }
       } catch (err) {
         if (err instanceof GatewayError) {
@@ -129,4 +132,17 @@ export function registerLabelsCommand(program: Command): void {
         process.exitCode = 1;
       }
     });
+  labels.command("approve <operation>").description("Review or explicitly approve a saved label purchase; retries reuse its exact request and key.")
+    .option("--key <key>", "Original API key")
+    .option("--approve", "Approve the displayed saved quote and maximum")
+    .action(async (id: string, opts: Record<string, unknown>, cmd: Command) => {
+      try { writeJson(await approveLabel(resolveConfig(cmd, opts), id, Boolean(opts["approve"]))); }
+      catch (err) { writeError(`${err instanceof Error ? err.message : String(err)} Retain operation ${id}; retry only this operation or reconcile with an operator.`); process.exitCode = 1; }
+    });
+  labels.command("cancel-preview <operation>").description("Cancel a preview that has never been approved.")
+    .action((id: string) => {
+      try { writeJson(cancelLabelPreview(id)); }
+      catch (err) { writeError(err instanceof Error ? err.message : String(err)); process.exitCode = 1; }
+    });
+
 }
