@@ -159,3 +159,9 @@ flexops labels cancel-preview <operation-id>
 Supply real shipment fields rather than the sandbox demo defaults for live postage. The maximum excludes later carrier adjustments and separate fees. `approve` without `--approve` dispatches only if that exact saved operation was already approved. It never obtains a fresh token or key automatically. OutcomeUnknown requires operator reconciliation; do not create another operation. Identical shipments with existing operations are blocked locally until resolved; use saved-operation replay for successful purchases too.
 
 Label operations are stored in `~/.flexops/label-purchases` or `FLEXOPS_LABEL_OPERATION_DIR`. They contain private addresses and signed tokens, but no API key. Keep this directory private and retain it across restarts; Windows uses inherited ACLs. Do not edit or share the files. Use the same Gateway and API key. Sandbox `labels create` remains a one-step synthetic response.
+
+## Guarded label release compatibility
+
+This release requires a Gateway deployment with the bounded label preview/approval contract (Gateway PR #509 or later). Do not use its live label preparation against an older Gateway: older servers may purchase immediately. Upgrade the Gateway and affected callers together during a purchase maintenance window.
+
+Live label creation now requires a USD maximum, preview, explicit approval, and replay of the saved request with its original idempotency key. Never retry an uncertain purchase with a new key. Sandbox results do not certify production postage.
