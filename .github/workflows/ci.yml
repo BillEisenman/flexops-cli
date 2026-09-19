@@ -45,3 +45,12 @@ jobs:
 
       - name: Test
         run: npm test
+
+  archive:
+    name: Verify archive helper
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify synthetic archives and filename contention
+        shell: pwsh
+        run: ./scripts/verify-archive.ps1
