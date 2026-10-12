@@ -26,6 +26,33 @@ function parsePositiveNumber(name: string, raw: string | undefined, fallback?: n
   return n;
 }
 
+/** Gateway HazmatClassification numbers, by --hazmat name. */
+const HAZMAT_CLASSES: Record<string, number> = {
+  "none": 0,
+  "limited-quantity": 1,
+  "lithium-battery-contained-in-equipment": 2,
+  "lithium-battery-packed-with-equipment": 3,
+  "lithium-battery-standalone": 4,
+  "other-restricted": 5,
+  "lithium-battery-used-device": 6,
+};
+
+/** Maps a --hazmat value (a class name or its number) to the Gateway HazmatClassification number. */
+export function parseHazmatClassification(raw: string): number {
+  const name = raw.trim().toLowerCase();
+  const value = /^\d$/.test(name) ? Number(name)
+    : Object.prototype.hasOwnProperty.call(HAZMAT_CLASSES, name) ? HAZMAT_CLASSES[name] : undefined;
+  if (value === undefined || value > 6)
+    throw new Error(`--hazmat must be none or one of ${Object.keys(HAZMAT_CLASSES).slice(1).join(", ")} (got "${raw}")`);
+  return value;
+}
+
+function parseOrderId(raw: string): number {
+  const n = Number(raw);
+  if (!Number.isSafeInteger(n) || n <= 0) throw new Error(`--order must be a positive whole number (got "${raw}")`);
+  return n;
+}
+
 export function registerLabelsCommand(program: Command): void {
   const labels = program.command("labels").description("Create and inspect shipping labels.");
 
@@ -55,10 +82,20 @@ export function registerLabelsCommand(program: Command): void {
     .option("--length-in <inches>", "Package length in inches", "10")
     .option("--width-in <inches>", "Package width in inches", "6")
     .option("--height-in <inches>", "Package height in inches", "4")
+    .option("--order <id>", "Order the label is bought against")
+    .option("--hazmat <none|class>", "What the parcel holds: none, or its HAZMAT class (" +
+      Object.keys(HAZMAT_CLASSES).slice(1).join(", ") + "); required without --order")
     .action(async (opts: Record<string, unknown>, cmd: Command) => {
       const cfg = resolveConfig(cmd, opts);
       try {
+        // A label without an order must say what it holds; the CLI never assumes "none".
+        const orderId = opts["order"] === undefined ? undefined : parseOrderId(String(opts["order"]));
+        const hazmatClassification = opts["hazmat"] === undefined ? undefined : parseHazmatClassification(String(opts["hazmat"]));
+        if (orderId === undefined && hazmatClassification === undefined)
+          throw new Error("--hazmat is required without --order: use --hazmat none for a parcel with no dangerous goods, or its class.");
         const payload = {
+          ...(orderId === undefined ? {} : { orderId }),
+          ...(hazmatClassification === undefined ? {} : { hazmatClassification }),
           carrierCode: String(opts["carrier"]),
           serviceCode: String(opts["service"]),
           origin: {

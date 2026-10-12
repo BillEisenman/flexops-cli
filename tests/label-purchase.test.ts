@@ -68,7 +68,7 @@ it("runs create and explicit approve in separate CLI processes", async () => {
     const run = (args: string[]) => promisify(execFile)(process.execPath, ['dist/index.js', '--json', ...args], {
       env: { ...process.env, FLEXOPS_API_KEY: 'live_synthetic', FLEXOPS_GATEWAY_URL: `http://127.0.0.1:${address.port}`, FLEXOPS_LABEL_OPERATION_DIR: store },
     });
-    const preview = JSON.parse((await run(['labels', 'create', '--maximum-postage', '10.00'])).stdout);
+    const preview = JSON.parse((await run(['labels', 'create', '--maximum-postage', '10.00', '--hazmat', 'none'])).stdout);
     expect(requests).toHaveLength(1);
     await run(['labels', 'approve', preview.operation]);
     expect(requests).toHaveLength(1);

@@ -7,7 +7,7 @@ Command-line companion for the [FlexOps Gateway API](https://gateway.flexops.io)
 npx @flexops/cli sandbox
 
 # 2. Use the key to ship a sandbox label
-npx @flexops/cli labels create --key test_… --from 78701 --to 97201 --weight-oz 8
+npx @flexops/cli labels create --key test_… --from 78701 --to 97201 --weight-oz 8 --hazmat none
 
 # 3. Track it
 npx @flexops/cli track 9400000000000000000000 --key test_…
@@ -38,7 +38,7 @@ Three ways to supply a key, evaluated in this order:
 ```bash
 # session-scoped:
 export FLEXOPS_API_KEY=test_yourkey
-flexops labels create --from 78701 --to 97201 --weight-oz 8
+flexops labels create --from 78701 --to 97201 --weight-oz 8 --hazmat none
 ```
 
 Keys must start with `test_` (sandbox, mock carriers) or `live_` (production, real money). Other prefixes are rejected loudly before the request goes out, which catches the classic "pasted a JWT instead of an API key" mistake.
@@ -60,6 +60,10 @@ Previews live postage or creates a synthetic sandbox label via `POST /api/v1/shi
 | `--from`, `--from-name`, `--from-address`, `--from-city`, `--from-state`, `--from-country` | `origin.*` | Austin TX 78701 |
 | `--to`, `--to-name`, `--to-address`, `--to-city`, `--to-state`, `--to-country` | `destination.*` | Portland OR 97201 |
 | `--weight-oz`, `--length-in`, `--width-in`, `--height-in` | `package.*` (units: oz / in) | 8 oz, 10×6×4 in |
+| `--order <id>` | `orderId` | none |
+| `--hazmat <none\|class>` | `hazmatClassification` (`none` = 0) | none; **required without `--order`** |
+
+A label without an order must say what the parcel holds. Pass `--hazmat none` for a parcel with no dangerous goods, or its class: `limited-quantity`, `lithium-battery-contained-in-equipment`, `lithium-battery-packed-with-equipment`, `lithium-battery-standalone`, `other-restricted`, `lithium-battery-used-device` (or the Gateway number, 0-6). The CLI never assumes `none`: without `--order` or `--hazmat` it stops before calling the Gateway. With `--order`, `--hazmat` is optional and sent only when given.
 
 ### `flexops track <trackingNumber>`
 
@@ -118,7 +122,7 @@ The local transport tests pass; actual ChatGPT discovery, confirmation UI and en
 
 ```bash
 KEY=$(npx @flexops/cli sandbox --json | jq -r .apiKey)
-npx @flexops/cli labels create --key $KEY --json | jq -r .trackingNumber
+npx @flexops/cli labels create --key $KEY --hazmat none --json | jq -r .trackingNumber
 ```
 
 **Use against a local Aspire dev gateway:**
@@ -126,7 +130,7 @@ npx @flexops/cli labels create --key $KEY --json | jq -r .trackingNumber
 ```bash
 FLEXOPS_GATEWAY_URL=https://localhost:7012 \
 FLEXOPS_API_KEY=test_yourkey \
-flexops labels create
+flexops labels create --hazmat none
 ```
 
 **Production cutover** — same commands, swap the key prefix:
@@ -134,7 +138,7 @@ flexops labels create
 ```bash
 export FLEXOPS_API_KEY=live_…
 flexops labels create --carrier USPS --service PRIORITY \
-  --from 78701 --to 97201 --weight-oz 12
+  --from 78701 --to 97201 --weight-oz 12 --hazmat none
 ```
 
 ## License
@@ -146,7 +150,7 @@ MIT © FlexOps, LLC
 Use these commands with Gateway's bounded approval contract, activating clients and Gateway together:
 
 ```sh
-flexops labels create --maximum-postage 10.00 --key live_... --json
+flexops labels create --maximum-postage 10.00 --hazmat none --key live_... --json
 # Review the returned operation ID, quote, USD maximum and expiry.
 flexops labels approve <operation-id>             # display saved preview; no first purchase
 flexops labels approve <operation-id> --approve   # explicit first approval
