@@ -47,7 +47,7 @@ Keys must start with `test_` (sandbox, mock carriers) or `live_` (production, re
 
 ### `flexops sandbox`
 
-POSTs to `/api/Sandbox/demo-keys` (no auth) and prints a freshly minted `test_` key plus its expiry. The endpoint is anonymous-IP-rate-limited; bursts get 429.
+POSTs to `/api/Sandbox/demo-keys` (no auth) and prints a freshly minted `test_` key plus its expiry. With `--json` it prints the Gateway response unchanged; the key is in `secretKey`. It exits non-zero if the response carries no `test_` key. The endpoint is anonymous-IP-rate-limited; bursts get 429.
 
 ### `flexops labels create`
 
@@ -121,7 +121,7 @@ The local transport tests pass; actual ChatGPT discovery, confirmation UI and en
 **Ship-it-now smoke test from a fresh terminal:**
 
 ```bash
-KEY=$(npx @flexops/cli sandbox --json | jq -r .apiKey)
+KEY=$(npx @flexops/cli sandbox --json | jq -r .secretKey)
 npx @flexops/cli labels create --key $KEY --hazmat none --json | jq -r .trackingNumber
 ```
 
