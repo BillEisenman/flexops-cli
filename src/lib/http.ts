@@ -6,12 +6,19 @@
  *
  * The Bearer-vs-X-API-Key trap bit us repeatedly during the 2026-05-26 wedge
  * shipping work; encoding the right header here keeps every command honest.
+ *
+ * Every POST, PUT and PATCH carries an `Idempotency-Key`: the caller's (a saved
+ * operation ID, reused on every retry of that operation) or a fresh UUID. The
+ * CLI never retries a request itself; a retry is always a deliberate re-run.
  */
 
+import { randomUUID } from "node:crypto";
 import { CLI_VERSION } from "../version.js";
 
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH"]);
+
 export interface GatewayRequestOptions {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   apiKey?: string;
   body?: unknown;
   timeoutMs?: number;
@@ -34,7 +41,7 @@ export async function gatewayFetch<T = unknown>(
   baseUrl: string,
   path: string,
   options: GatewayRequestOptions = {}
-): Promise<T> {
+): Promise<T | undefined> {
   const { method = "GET", apiKey, body, timeoutMs = 15_000, signal } = options;
 
   const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
@@ -52,6 +59,7 @@ export async function gatewayFetch<T = unknown>(
   };
   if (apiKey) headers["X-API-Key"] = apiKey;
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
+  else if (WRITE_METHODS.has(method)) headers["Idempotency-Key"] = randomUUID();
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
   let response: Response;
@@ -89,5 +97,7 @@ export async function gatewayFetch<T = unknown>(
     throw new GatewayError(summary, response.status, parsed);
   }
 
+  // A 2xx with no body (204, or Content-Length 0) has nothing to return.
+  if (text.length === 0) return undefined;
   return parsed as T;
 }

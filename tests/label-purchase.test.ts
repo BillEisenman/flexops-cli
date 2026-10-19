@@ -78,3 +78,13 @@ it("runs create and explicit approve in separate CLI processes", async () => {
     expect(requests[0]!.key).toBe(requests[1]!.key);
   } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
 });
+it("treats an empty purchase response as unresolved, never as a label", async () => {
+  const prepared = await prepareLabel(config, payload, 10, store);
+  if (!("operation" in prepared)) throw new Error("Expected preview");
+  call.mockResolvedValueOnce(undefined);
+  await expect(approveLabel(config, prepared.operation, true, store)).rejects.toThrow(`Unresolved purchase ${prepared.operation}`);
+});
+it("refuses an empty preview response", async () => {
+  call.mockReset(); call.mockResolvedValueOnce(undefined);
+  await expect(prepareLabel(config, payload, 10, store)).rejects.toThrow("valid bounded preview");
+});
