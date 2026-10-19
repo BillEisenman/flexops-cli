@@ -69,3 +69,50 @@ describe("gatewayFetch", () => {
     }
   });
 });
+
+describe("gatewayFetch writes and empty responses", () => {
+  const fetchMock = () => fetch as unknown as ReturnType<typeof vi.fn>;
+  const sentHeaders = (index = 0) => (fetchMock().mock.calls[index]![1] as RequestInit).headers as Record<string, string>;
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends a fresh UUID Idempotency-Key on every POST, PUT and PATCH without a caller key", async () => {
+    for (const method of ["POST", "PUT", "PATCH"] as const) fetchMock().mockResolvedValueOnce(jsonResponse({}));
+    await gatewayFetch("https://gw.example", "/x", { method: "POST", body: {} });
+    await gatewayFetch("https://gw.example", "/x", { method: "PUT", body: {} });
+    await gatewayFetch("https://gw.example", "/x", { method: "PATCH", body: {} });
+    const keys = [0, 1, 2].map(i => sentHeaders(i)["Idempotency-Key"]);
+    for (const key of keys) expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  it("keeps the caller's Idempotency-Key, and sends none on GET or DELETE", async () => {
+    fetchMock().mockImplementation(async () => jsonResponse({}));
+    await gatewayFetch("https://gw.example", "/x", { method: "POST", body: {}, idempotencyKey: "saved-operation" });
+    await gatewayFetch("https://gw.example", "/x");
+    await gatewayFetch("https://gw.example", "/x", { method: "DELETE" });
+    expect(sentHeaders(0)["Idempotency-Key"]).toBe("saved-operation");
+    expect(sentHeaders(1)["Idempotency-Key"]).toBeUndefined();
+    expect(sentHeaders(2)["Idempotency-Key"]).toBeUndefined();
+  });
+
+  it("sends a write exactly once: no retry after a 500 or a network error", async () => {
+    fetchMock().mockResolvedValueOnce(jsonResponse({ message: "boom" }, { status: 500 }));
+    await expect(gatewayFetch("https://gw.example", "/x", { method: "POST", body: {} })).rejects.toThrow("boom");
+    fetchMock().mockRejectedValueOnce(new Error("ECONNRESET"));
+    await expect(gatewayFetch("https://gw.example", "/x", { method: "POST", body: {} })).rejects.toThrow("ECONNRESET");
+    expect(fetchMock()).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns undefined for a 204 and for an empty 200", async () => {
+    fetchMock().mockResolvedValueOnce(new Response(null, { status: 204 }));
+    fetchMock().mockResolvedValueOnce(new Response("", { status: 200, headers: { "content-length": "0" } }));
+    expect(await gatewayFetch("https://gw.example", "/x", { method: "DELETE" })).toBeUndefined();
+    expect(await gatewayFetch("https://gw.example", "/x", { method: "POST", body: {} })).toBeUndefined();
+  });
+});

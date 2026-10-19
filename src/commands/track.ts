@@ -26,11 +26,12 @@ export function registerTrackCommand(program: Command): void {
       const cfg = resolveConfig(cmd, opts);
       try {
         const apiKey = requireApiKey(cfg);
-        const response = await gatewayFetch<TrackingResponse>(
-          cfg.gatewayUrl,
-          `/api/v1/shipping/track/${encodeURIComponent(trackingNumber)}`,
-          { apiKey }
-        );
+        const response: TrackingResponse =
+          (await gatewayFetch<TrackingResponse>(
+            cfg.gatewayUrl,
+            `/api/v1/shipping/track/${encodeURIComponent(trackingNumber)}`,
+            { apiKey }
+          )) ?? {};
 
         if (cfg.json) {
           writeJson(response);

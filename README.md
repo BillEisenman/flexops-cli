@@ -110,6 +110,12 @@ Keep the host running, then create a private developer-mode MCP connection in Ch
 
 The local transport tests pass; actual ChatGPT discovery, confirmation UI and end-to-end writes must be verified in the target account before claiming ChatGPT certification. Start with synthetic records, decline one preview, approve another, and verify its authoritative inventory/action records. On any uncertain result, stop and reconcile from the terminal using the original operation ID.
 
+## Gateway calls and retries
+
+The CLI calls only documented, API-key-callable Gateway operations: `POST /api/Sandbox/demo-keys`, `POST /api/v1/shipping/labels`, `GET /api/v1/shipping/track/{trackingNumber}` and `POST /api/mcp` (inventory). It never writes through the legacy `/api/ApiProxy`. `npm test` checks every command against the documented operation list in `tests/fixtures/gateway-operations.json`.
+
+Every POST, PUT and PATCH sends an `Idempotency-Key`: the saved operation ID for label purchases and inventory adjustments, otherwise a fresh UUID. The CLI never retries a request on its own; re-run the saved operation instead. An empty success response (204) is treated as no result, so a label purchase that returns no tracking number stays an unresolved operation.
+
 ## Global flags
 
 - `--gateway-url <url>` — point the CLI at a non-production Gateway (e.g. local dev). Also reads `FLEXOPS_GATEWAY_URL`.

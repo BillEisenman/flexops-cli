@@ -33,8 +33,8 @@ export async function prepareLabel(config: ResolvedConfig, payload: Record<strin
   const response = await gatewayFetch<Preview & { isSandbox?: boolean; trackingNumber?: string }>(gateway, "/api/v1/shipping/labels", {
     method: "POST", apiKey: key, idempotencyKey: id, body,
   });
-  if (response.isSandbox === true && response.trackingNumber) return response;
-  if (response.status !== "Preview" || !response.confirmationToken || response.currency !== "USD" ||
+  if (response?.isSandbox === true && response.trackingNumber) return response;
+  if (!response || response.status !== "Preview" || !response.confirmationToken || response.currency !== "USD" ||
       !Number.isFinite(response.quotedPostageAmount) || response.quotedPostageAmount <= 0 || response.quotedPostageAmount > maximum! ||
       response.maximumPostageAmount !== maximum || !Number.isFinite(Date.parse(response.expiresAt)))
     throw new Error("Gateway did not return a valid bounded preview. Nothing was approved.");
@@ -62,7 +62,7 @@ export async function approveLabel(config: ResolvedConfig, id: string, approve =
   if (JSON.parse(readFileSync(decision, "utf8")).hash !== hash(op.body)) throw new Error("Approved purchase changed.");
   // Once dispatch is possible, even after a crash, only the saved key and body may be retried.
   const result = await gatewayFetch<Record<string, unknown>>(gateway, "/api/v1/shipping/labels", { method: "POST", apiKey: key, idempotencyKey: id, body });
-  if (!result.trackingNumber) throw new Error(`Unresolved purchase ${id}. Retain this operation and reconcile; do not create another label.`);
+  if (!result?.trackingNumber) throw new Error(`Unresolved purchase ${id}. Retain this operation and reconcile; do not create another label.`);
   return { operation: id, ...result };
 }
 export function cancelLabelPreview(id: string, store = root()) {
