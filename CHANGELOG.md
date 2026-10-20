@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0 (unreleased)
+## 0.5.0 (2026-10-19)
 
 Aligns the CLI with the documented public Gateway API ahead of the Gateway's order-less HAZMAT Enforce rule.
 
