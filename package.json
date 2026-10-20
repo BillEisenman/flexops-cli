@@ -29,7 +29,7 @@
     "node": ">=18"
   },
   "bin": {
-    "flexops": "./dist/index.js"
+    "flexops": "dist/index.js"
   },
   "main": "./dist/index.js",
   "files": [
