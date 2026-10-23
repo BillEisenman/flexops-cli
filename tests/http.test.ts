@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { gatewayFetch, GatewayError } from "../src/lib/http.js";
+import { gatewayFetch, GatewayError, describeError, describeStatus } from "../src/lib/http.js";
 
 function jsonResponse(body: unknown, init: { status?: number } = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -114,5 +114,41 @@ describe("gatewayFetch writes and empty responses", () => {
     fetchMock().mockResolvedValueOnce(new Response("", { status: 200, headers: { "content-length": "0" } }));
     expect(await gatewayFetch("https://gw.example", "/x", { method: "DELETE" })).toBeUndefined();
     expect(await gatewayFetch("https://gw.example", "/x", { method: "POST", body: {} })).toBeUndefined();
+  });
+});
+
+describe("GatewayError codes", () => {
+  it("reads the Gateway errorCode, and ignores a missing or non-identifier one", () => {
+    expect(new GatewayError("m", 400, { message: "m", errorCode: "HAZMAT_ATTESTATION_REQUIRED" }).code).toBe("HAZMAT_ATTESTATION_REQUIRED");
+    expect(new GatewayError("m", 400, { message: "m" }).code).toBeUndefined();
+    expect(new GatewayError("m", 400, { errorCode: 7 }).code).toBeUndefined();
+    expect(new GatewayError("m", 400, { errorCode: "" }).code).toBeUndefined();
+    expect(new GatewayError("m", 400, { errorCode: "a b" }).code).toBeUndefined();
+    expect(new GatewayError("m", 502, "plain text").code).toBeUndefined();
+    expect(new GatewayError("m", 502, null).code).toBeUndefined();
+  });
+
+  it("puts the status and code in front of the message in human mode only", () => {
+    const err = new GatewayError("Service 'PRIORITY' is not eligible.", 400, { errorCode: "VALIDATION_FAILED" });
+    expect(describeStatus(err)).toBe("HTTP 400 VALIDATION_FAILED");
+    expect(describeStatus(err, true)).toBe("HTTP 400");
+    expect(describeError(err)).toBe("HTTP 400 VALIDATION_FAILED: Service 'PRIORITY' is not eligible.");
+    expect(describeError(err, true)).toBe("Service 'PRIORITY' is not eligible.");
+    expect(describeStatus(new GatewayError("m", 500, {}))).toBe("HTTP 500");
+    expect(describeError(new GatewayError("m", 500, {}))).toBe("HTTP 500: m");
+    expect(describeError(new Error("plain"))).toBe("plain");
+    expect(describeError("text")).toBe("text");
+  });
+
+  it("gatewayFetch carries the code on the thrown error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(
+      jsonResponse({ success: false, message: "declare it", errorCode: "HazmatDeclarationRequired" }, { status: 400 })));
+    try {
+      await expect(gatewayFetch("https://gw.example", "/x", { method: "POST", body: {} })).rejects.toMatchObject({
+        status: 400, message: "declare it", code: "HazmatDeclarationRequired",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

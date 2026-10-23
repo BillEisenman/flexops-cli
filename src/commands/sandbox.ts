@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { resolveConfig } from "../lib/config.js";
-import { gatewayFetch, GatewayError } from "../lib/http.js";
+import { gatewayFetch, GatewayError, describeStatus } from "../lib/http.js";
 import { writeJson, writeStdout, writeSuccess, writeInfo, writeError, dim, bold } from "../lib/output.js";
 
 /**
@@ -65,7 +65,7 @@ export function registerSandboxCommand(program: Command): void {
         writeStdout(`  ${dim(`flexops labels create --key ${response.secretKey} --from 78701 --to 97201 --weight-oz 8 --hazmat none`)}`);
       } catch (err) {
         if (err instanceof GatewayError) {
-          writeError(`Gateway rejected demo-key request (HTTP ${err.status}): ${err.message}`);
+          writeError(`Gateway rejected demo-key request (${describeStatus(err, cfg.json)}): ${err.message}`);
         } else {
           writeError(err instanceof Error ? err.message : String(err));
         }

@@ -1,7 +1,7 @@
 import { prepareLabel, approveLabel, cancelLabelPreview } from "./label-purchase.js";
 import { Command } from "commander";
 import { resolveConfig } from "../lib/config.js";
-import { GatewayError } from "../lib/http.js";
+import { GatewayError, describeError, describeStatus } from "../lib/http.js";
 import { writeJson, writeStdout, writeSuccess, writeInfo, writeError, dim, bold } from "../lib/output.js";
 
 interface LabelResponse {
@@ -37,6 +37,23 @@ const HAZMAT_CLASSES: Record<string, number> = {
   "lithium-battery-used-device": 6,
 };
 
+/**
+ * HAZMAT classes USPS carries on Ground Advantage only: limited-quantity, lithium-battery-standalone,
+ * other-restricted and lithium-battery-used-device. Mirrors the Gateway's
+ * HazmatEligibility.GetEligibleMailClasses, which refuses any other service for them (400 VALIDATION_FAILED).
+ */
+const USPS_GROUND_ONLY_HAZMAT = new Set([1, 4, 5, 6]);
+
+/**
+ * The service to send. PRIORITY is only the demo default, and a ground-only USPS class can't ship on
+ * it, so when --service wasn't given such a class gets the one service it allows. An explicit
+ * --service is always sent as given.
+ */
+export function resolveServiceCode(service: string, serviceGiven: boolean, carrier: string, hazmatClassification?: number): string {
+  if (serviceGiven || carrier.trim().toUpperCase() !== "USPS" || hazmatClassification === undefined) return service;
+  return USPS_GROUND_ONLY_HAZMAT.has(hazmatClassification) ? "GROUND_ADVANTAGE" : service;
+}
+
 /** Maps a --hazmat value (a class name or its number) to the Gateway HazmatClassification number. */
 export function parseHazmatClassification(raw: string): number {
   const name = raw.trim().toLowerCase();
@@ -64,7 +81,9 @@ export function registerLabelsCommand(program: Command): void {
     )
     .option("--key <key>", "API key (defaults to FLEXOPS_API_KEY)")
     .option("--carrier <code>", "Carrier code (USPS, UPS, FEDEX, DHL)", "USPS")
-    .option("--service <code>", "Service code (PRIORITY, GROUND, etc.)", "PRIORITY")
+    .option("--service <code>", "Service code (PRIORITY, GROUND_ADVANTAGE, etc.); a USPS --hazmat class that ships " +
+      "ground only (limited-quantity, lithium-battery-standalone, other-restricted, lithium-battery-used-device) " +
+      "defaults to GROUND_ADVANTAGE", "PRIORITY")
     .option("--from <postalCode>", "Origin postal code", "78701")
     .option("--from-name <name>", "Origin contact name", "FlexOps Demo")
     .option("--from-address <line1>", "Origin street address", "1 Demo Way")
@@ -93,11 +112,15 @@ export function registerLabelsCommand(program: Command): void {
         const hazmatClassification = opts["hazmat"] === undefined ? undefined : parseHazmatClassification(String(opts["hazmat"]));
         if (orderId === undefined && hazmatClassification === undefined)
           throw new Error("--hazmat is required without --order: use --hazmat none for a parcel with no dangerous goods, or its class.");
+        const serviceGiven = cmd.getOptionValueSource("service") !== "default";
+        const serviceCode = resolveServiceCode(String(opts["service"]), serviceGiven, String(opts["carrier"]), hazmatClassification);
+        if (serviceCode !== String(opts["service"]) && !cfg.json)
+          writeInfo(`--hazmat ${String(opts["hazmat"])} ships on USPS Ground Advantage only: using GROUND_ADVANTAGE, not the PRIORITY default. Pass --service to choose.`);
         const payload = {
           ...(orderId === undefined ? {} : { orderId }),
           ...(hazmatClassification === undefined ? {} : { hazmatClassification }),
           carrierCode: String(opts["carrier"]),
-          serviceCode: String(opts["service"]),
+          serviceCode,
           origin: {
             name: String(opts["fromName"]),
             addressLine1: String(opts["fromAddress"]),
@@ -161,7 +184,7 @@ export function registerLabelsCommand(program: Command): void {
         }
       } catch (err) {
         if (err instanceof GatewayError) {
-          writeError(`Gateway rejected label request (HTTP ${err.status}): ${err.message}`);
+          writeError(`Gateway rejected label request (${describeStatus(err, cfg.json)}): ${err.message}`);
           if (cfg.json) writeJson({ error: { status: err.status, body: err.body } });
         } else {
           writeError(err instanceof Error ? err.message : String(err));
@@ -173,8 +196,9 @@ export function registerLabelsCommand(program: Command): void {
     .option("--key <key>", "Original API key")
     .option("--approve", "Approve the displayed saved quote and maximum")
     .action(async (id: string, opts: Record<string, unknown>, cmd: Command) => {
-      try { writeJson(await approveLabel(resolveConfig(cmd, opts), id, Boolean(opts["approve"]))); }
-      catch (err) { writeError(`${err instanceof Error ? err.message : String(err)} Retain operation ${id}; retry only this operation or reconcile with an operator.`); process.exitCode = 1; }
+      const cfg = resolveConfig(cmd, opts);
+      try { writeJson(await approveLabel(cfg, id, Boolean(opts["approve"]))); }
+      catch (err) { writeError(`${describeError(err, cfg.json)} Retain operation ${id}; retry only this operation or reconcile with an operator.`); process.exitCode = 1; }
     });
   labels.command("cancel-preview <operation>").description("Cancel a preview that has never been approved.")
     .action((id: string) => {

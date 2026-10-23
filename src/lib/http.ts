@@ -27,6 +27,13 @@ export interface GatewayRequestOptions {
 }
 
 export class GatewayError extends Error {
+  /**
+   * The Gateway's machine-readable `errorCode` (for example `HazmatDeclarationRequired` or
+   * `VALIDATION_FAILED`), when the body carries one. Only identifier-shaped codes are kept, so
+   * a malformed body can't put arbitrary text into the status line.
+   */
+  public readonly code: string | undefined;
+
   constructor(
     message: string,
     public readonly status: number,
@@ -34,7 +41,27 @@ export class GatewayError extends Error {
   ) {
     super(message);
     this.name = "GatewayError";
+    const code = typeof body === "object" && body !== null ? (body as { errorCode?: unknown }).errorCode : undefined;
+    this.code = typeof code === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(code) ? code : undefined;
   }
+}
+
+/**
+ * `HTTP 400 HazmatDeclarationRequired` in human mode, or `HTTP 400` without a code. With `--json`
+ * it stays `HTTP 400`: JSON output is unchanged, and `labels create --json` already prints the body.
+ */
+export function describeStatus(err: GatewayError, json = false): string {
+  return json || err.code === undefined ? `HTTP ${err.status}` : `HTTP ${err.status} ${err.code}`;
+}
+
+/**
+ * One-line text for any error a command catches. In human mode a Gateway refusal leads with its
+ * status and error code (`HTTP 400 VALIDATION_FAILED: <message>`); with `--json`, and for every
+ * other error, it is the message alone, as before.
+ */
+export function describeError(err: unknown, json = false): string {
+  if (err instanceof GatewayError && !json) return `${describeStatus(err)}: ${err.message}`;
+  return err instanceof Error ? err.message : String(err);
 }
 
 export async function gatewayFetch<T = unknown>(
