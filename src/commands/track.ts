@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { resolveConfig, requireApiKey } from "../lib/config.js";
-import { gatewayFetch, GatewayError } from "../lib/http.js";
+import { gatewayFetch, GatewayError, describeStatus } from "../lib/http.js";
 import { writeJson, writeStdout, writeSuccess, writeInfo, writeError, dim, bold } from "../lib/output.js";
 
 interface TrackingResponse {
@@ -57,7 +57,7 @@ export function registerTrackCommand(program: Command): void {
         }
       } catch (err) {
         if (err instanceof GatewayError) {
-          writeError(`Gateway rejected tracking lookup (HTTP ${err.status}): ${err.message}`);
+          writeError(`Gateway rejected tracking lookup (${describeStatus(err, cfg.json)}): ${err.message}`);
         } else {
           writeError(err instanceof Error ? err.message : String(err));
         }

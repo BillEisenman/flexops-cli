@@ -56,7 +56,7 @@ Previews live postage or creates a synthetic sandbox label via `POST /api/v1/shi
 | Flag | Maps to | Default |
 |---|---|---|
 | `--carrier` | `carrierCode` | `USPS` |
-| `--service` | `serviceCode` | `PRIORITY` |
+| `--service` | `serviceCode` | `PRIORITY`; `GROUND_ADVANTAGE` for a ground-only USPS `--hazmat` class |
 | `--from`, `--from-name`, `--from-address`, `--from-city`, `--from-state`, `--from-country` | `origin.*` | Austin TX 78701 |
 | `--to`, `--to-name`, `--to-address`, `--to-city`, `--to-state`, `--to-country` | `destination.*` | Portland OR 97201 |
 | `--weight-oz`, `--length-in`, `--width-in`, `--height-in` | `package.*` (units: oz / in) | 8 oz, 10×6×4 in |
@@ -64,6 +64,10 @@ Previews live postage or creates a synthetic sandbox label via `POST /api/v1/shi
 | `--hazmat <none\|class>` | `hazmatClassification` (`none` = 0) | none; **required without `--order`** |
 
 A label without an order must say what the parcel holds. Pass `--hazmat none` for a parcel with no dangerous goods, or its class: `limited-quantity`, `lithium-battery-contained-in-equipment`, `lithium-battery-packed-with-equipment`, `lithium-battery-standalone`, `other-restricted`, `lithium-battery-used-device` (or the Gateway number, 0-6). The CLI never assumes `none`: without `--order` or `--hazmat` it stops before calling the Gateway. With `--order`, `--hazmat` is optional and sent only when given.
+
+USPS carries `limited-quantity`, `lithium-battery-standalone`, `other-restricted` and `lithium-battery-used-device` on Ground Advantage only, and the Gateway refuses any other service for them (400 `VALIDATION_FAILED`). With one of those classes on USPS and no `--service`, the CLI sends `GROUND_ADVANTAGE` instead of the `PRIORITY` default and says so. An explicit `--service` is always sent as given.
+
+When the Gateway refuses a request, the error names its status and error code, for example `Gateway rejected label request (HTTP 400 HazmatDeclarationRequired): <message>`. With `--json` the output is unchanged: `labels create --json` prints `{ "error": { "status", "body" } }`, and the code is `body.errorCode`.
 
 ### `flexops track <trackingNumber>`
 

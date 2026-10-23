@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer, type Server } from "node:http";
 import { execFile } from "node:child_process";
-import { parseHazmatClassification } from "../src/commands/labels.js";
+import { parseHazmatClassification, resolveServiceCode } from "../src/commands/labels.js";
 
 describe("parseHazmatClassification", () => {
   it("maps names and numbers to the Gateway HazmatClassification number", () => {
@@ -21,6 +21,18 @@ describe("parseHazmatClassification", () => {
 
   it("refuses anything else", () => {
     for (const raw of ["", "bogus", "7", "-1", "1.5", "constructor", "__proto__"]) expect(() => parseHazmatClassification(raw)).toThrow("--hazmat");
+  });
+});
+
+describe("resolveServiceCode", () => {
+  it("gives ground-only USPS classes (1, 4, 5, 6) GROUND_ADVANTAGE only when --service was not given", () => {
+    for (const cls of [1, 4, 5, 6]) {
+      expect(resolveServiceCode("PRIORITY", false, "USPS", cls)).toBe("GROUND_ADVANTAGE");
+      expect(resolveServiceCode("PRIORITY", false, " usps ", cls)).toBe("GROUND_ADVANTAGE");
+      expect(resolveServiceCode("PRIORITY", true, "USPS", cls)).toBe("PRIORITY");
+      expect(resolveServiceCode("PRIORITY", false, "UPS", cls)).toBe("PRIORITY");
+    }
+    for (const cls of [0, 2, 3, undefined]) expect(resolveServiceCode("PRIORITY", false, "USPS", cls)).toBe("PRIORITY");
   });
 });
 
@@ -79,6 +91,43 @@ describe("labels create --hazmat / --order", () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("--hazmat");
     expect(bodies).toHaveLength(0);
+  });
+
+  it("sends GROUND_ADVANTAGE for a ground-only class when --service is not given", async () => {
+    for (const hazmat of ["limited-quantity", "lithium-battery-standalone", "other-restricted", "lithium-battery-used-device", "4"]) {
+      bodies.length = 0;
+      rmSync(store, { recursive: true, force: true });
+      expect((await run(["--hazmat", hazmat])).code).toBe(0);
+      expect(bodies[0]!["serviceCode"]).toBe("GROUND_ADVANTAGE");
+      expect(bodies[0]!["carrierCode"]).toBe("USPS");
+    }
+  });
+
+  it("keeps PRIORITY for none and for air-eligible classes, an explicit --service, and other carriers", async () => {
+    const cases: [string[], string][] = [
+      [["--hazmat", "none"], "PRIORITY"],
+      [["--hazmat", "lithium-battery-contained-in-equipment"], "PRIORITY"],
+      [["--hazmat", "lithium-battery-packed-with-equipment"], "PRIORITY"],
+      [["--hazmat", "lithium-battery-standalone", "--service", "PRIORITY"], "PRIORITY"],
+      [["--hazmat", "limited-quantity", "--carrier", "UPS"], "PRIORITY"],
+      [["--order", "42"], "PRIORITY"],
+    ];
+    for (const [args, expected] of cases) {
+      bodies.length = 0;
+      rmSync(store, { recursive: true, force: true });
+      expect((await run(args)).code).toBe(0);
+      expect(bodies[0]!["serviceCode"]).toBe(expected);
+    }
+  });
+
+  it("says why the service changed in human mode", async () => {
+    const result = await new Promise<{ stdout: string }>(resolve => {
+      execFile(process.execPath, ["dist/index.js", "labels", "create", "--maximum-postage", "10.00", "--hazmat", "other-restricted"], {
+        env: { ...process.env, NO_COLOR: "1", FLEXOPS_API_KEY: "live_synthetic", FLEXOPS_GATEWAY_URL: `http://127.0.0.1:${port}`, FLEXOPS_LABEL_OPERATION_DIR: store },
+      }, (_error, stdout) => resolve({ stdout }));
+    });
+    expect(result.stdout).toContain("--hazmat other-restricted ships on USPS Ground Advantage only: using GROUND_ADVANTAGE, not the PRIORITY default. Pass --service to choose.");
+    expect(result.stdout).toContain("Preparing USPS GROUND_ADVANTAGE label");
   });
 
   it("refuses an unknown class and an invalid order before calling the Gateway", async () => {
