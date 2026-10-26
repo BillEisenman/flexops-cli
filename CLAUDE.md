@@ -21,7 +21,7 @@ Use the scripts in `package.json`: `npm run typecheck`, `npm test` (builds first
                               FlexOps.Integrations.Api (store connectors)
 ```
 
-The CLI is a thin command surface over the Gateway HTTP API. It does **not** talk to VSCS or Integrations directly — Gateway is the single ingress (see the FlexOpsPlatform CLAUDE.md for the perimeter model).
+The CLI is a thin command surface over the Gateway HTTP API. It does **not** talk to VSCS or Integrations directly — Gateway is the single ingress (see the FlexOpsGateway CLAUDE.md, "Proxied Backends", for the perimeter model).
 
 ## Conventions
 
