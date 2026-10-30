@@ -6,8 +6,9 @@ Command-line companion for the [FlexOps Gateway API](https://gateway.flexops.io)
 # 1. Get a free sandbox key (no signup, ~1 hour TTL, mock carriers)
 npx @flexops/cli sandbox
 
-# 2. Use the key to ship a sandbox label
-npx @flexops/cli labels create --key test_… --from 78701 --to 97201 --weight-oz 8 --hazmat none
+# 2. Use the key to preview a sandbox label, then approve the operation it prints
+npx @flexops/cli labels create --key test_… --from 78701 --to 97201 --weight-oz 8 --hazmat none --maximum-postage 20.00
+npx @flexops/cli labels approve <operation-id> --approve --key test_…
 
 # 3. Track it
 npx @flexops/cli track 9400000000000000000000 --key test_…
@@ -38,7 +39,7 @@ Three ways to supply a key, evaluated in this order:
 ```bash
 # session-scoped:
 export FLEXOPS_API_KEY=test_yourkey
-flexops labels create --from 78701 --to 97201 --weight-oz 8 --hazmat none
+flexops labels create --from 78701 --to 97201 --weight-oz 8 --hazmat none --maximum-postage 20.00
 ```
 
 Keys must start with `test_` (sandbox, mock carriers) or `live_` (production, real money). Other prefixes are rejected loudly before the request goes out, which catches the classic "pasted a JWT instead of an API key" mistake.
@@ -51,7 +52,7 @@ POSTs to `/api/Sandbox/demo-keys` (no auth) and prints a freshly minted `test_` 
 
 ### `flexops labels create`
 
-Previews live postage or creates a synthetic sandbox label via `POST /api/v1/shipping/labels`. Flags map to the `LabelRequest` DTO the Gateway expects:
+Previews a label, live or sandbox, via `POST /api/v1/shipping/labels`, and `labels approve` buys it. A sandbox label is synthetic and buys no postage. `--maximum-postage` is required. Flags map to the `LabelRequest` DTO the Gateway expects:
 
 | Flag | Maps to | Default |
 |---|---|---|
@@ -132,7 +133,8 @@ Every POST, PUT and PATCH sends an `Idempotency-Key`: the saved operation ID for
 
 ```bash
 KEY=$(npx @flexops/cli sandbox --json | jq -r .secretKey)
-npx @flexops/cli labels create --key $KEY --hazmat none --json | jq -r .trackingNumber
+OP=$(npx @flexops/cli labels create --key $KEY --hazmat none --maximum-postage 20.00 --json | jq -r .operation)
+npx @flexops/cli labels approve $OP --approve --key $KEY --json | jq -r .trackingNumber
 ```
 
 **Use against a local Aspire dev gateway:**
@@ -140,7 +142,7 @@ npx @flexops/cli labels create --key $KEY --hazmat none --json | jq -r .tracking
 ```bash
 FLEXOPS_GATEWAY_URL=https://localhost:7012 \
 FLEXOPS_API_KEY=test_yourkey \
-flexops labels create --hazmat none
+flexops labels create --hazmat none --maximum-postage 20.00
 ```
 
 **Production cutover** — same commands, swap the key prefix:
@@ -148,7 +150,7 @@ flexops labels create --hazmat none
 ```bash
 export FLEXOPS_API_KEY=live_…
 flexops labels create --carrier USPS --service PRIORITY \
-  --from 78701 --to 97201 --weight-oz 12 --hazmat none
+  --from 78701 --to 97201 --weight-oz 12 --hazmat none --maximum-postage 20.00
 ```
 
 ## License
@@ -157,7 +159,7 @@ MIT © FlexOps, LLC
 
 ### Live label approval and recovery
 
-Use these commands with Gateway's bounded approval contract, activating clients and Gateway together:
+Use these commands with Gateway's bounded approval contract, activating clients and Gateway together. A `test_` key takes the same steps:
 
 ```sh
 flexops labels create --maximum-postage 10.00 --hazmat none --key live_... --json

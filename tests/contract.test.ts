@@ -97,7 +97,7 @@ describe("Gateway contract", () => {
   const scenarios: Record<string, () => Promise<unknown>> = {
     "sandbox": () => run(["sandbox"], ""),
     "track": () => run(["track", "9400100000000000000000"], "test_contract"),
-    "labels create": () => run(["labels", "create", "--hazmat", "none"], "test_contract"),
+    "labels create": () => run(["labels", "create", "--maximum-postage", "10.00", "--hazmat", "none"], "test_contract"),
     "labels approve": async () => run(["labels", "approve", operationOf(await livePreview()), "--approve"]),
     "labels cancel-preview": async () => run(["labels", "cancel-preview", operationOf(await run(["labels", "create",
       "--maximum-postage", "10.00", "--hazmat", "none", "--to", "10001"]))]),

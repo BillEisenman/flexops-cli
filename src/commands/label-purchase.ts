@@ -19,7 +19,7 @@ function credentials(config: ResolvedConfig) {
 }
 export async function prepareLabel(config: ResolvedConfig, payload: Record<string, unknown>, maximum?: number, store = root()) {
   const { key, gateway } = credentials(config);
-  if (!key.startsWith("test_") && (!maximum || maximum <= 0 || !Number.isFinite(maximum) || maximum > 1000000 || Math.abs(maximum * 100 - Math.round(maximum * 100)) > 1e-7))
+  if (!maximum || maximum <= 0 || !Number.isFinite(maximum) || maximum > 1000000 || Math.abs(maximum * 100 - Math.round(maximum * 100)) > 1e-7)
     throw new Error("Supply --maximum-postage in USD with at most two decimal places.");
   const requestHash = hash(JSON.stringify(payload));
   if (existsSync(store)) for (const id of readdirSync(store)) {

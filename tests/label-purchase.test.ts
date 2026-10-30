@@ -15,6 +15,25 @@ beforeEach(() => {
     currency: "USD", expiresAt: new Date(Date.now() + 300000).toISOString(), confirmationToken: "signed-preview" });
 });
 afterEach(() => rmSync(store, { recursive: true, force: true }));
+const sandbox = { ...config, apiKey: "test_synthetic" };
+it("refuses a sandbox key with no maximum before calling Gateway", async () => {
+  await expect(prepareLabel(sandbox, payload, undefined, store)).rejects.toThrow("--maximum-postage");
+  expect(call).not.toHaveBeenCalled();
+});
+it("saves a sandbox preview and buys only on approval", async () => {
+  const prepared = await prepareLabel(sandbox, payload, 10, store) as { operation: string; status: string };
+  expect(prepared.status).toBe("AwaitingApproval");
+  expect(call).toHaveBeenCalledTimes(1);
+  call.mockResolvedValueOnce({ isSandbox: true, trackingNumber: "SBOX1" });
+  const bought = await approveLabel(sandbox, prepared.operation, true, store);
+  expect(bought).toMatchObject({ operation: prepared.operation, trackingNumber: "SBOX1" });
+  expect((call.mock.calls[1]![2] as { body: { confirmationToken: string } }).body.confirmationToken).toBe("signed-preview");
+});
+it("returns the label from a Gateway that has not started previewing sandbox labels", async () => {
+  call.mockReset();
+  call.mockResolvedValueOnce({ isSandbox: true, trackingNumber: "SBOX2" });
+  expect(await prepareLabel(sandbox, payload, 10, store)).toMatchObject({ trackingNumber: "SBOX2" });
+});
 it("persists a preview and cancellation never purchases", async () => {
   const prepared = await prepareLabel(config, payload, 10, store);
   if (!("operation" in prepared)) throw new Error("Expected preview");
