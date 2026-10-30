@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 (unreleased)
+
+### Breaking
+
+- `labels create` requires `--maximum-postage` with a `test_` key too, and sandbox labels are bought with `labels approve`, the same as live. The Gateway now previews sandbox labels and refuses one with no maximum, so earlier versions can't create a sandbox label against it.
+
 ## 0.6.0 (2026-10-22)
 
 ### Fixed

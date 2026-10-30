@@ -61,8 +61,8 @@ export function registerSandboxCommand(program: Command): void {
         writeInfo("Persist it for this terminal session:");
         writeStdout(`  ${dim("export FLEXOPS_API_KEY=" + response.secretKey)}`);
         writeStdout("");
-        writeInfo("Or ship a label immediately:");
-        writeStdout(`  ${dim(`flexops labels create --key ${response.secretKey} --from 78701 --to 97201 --weight-oz 8 --hazmat none`)}`);
+        writeInfo("Or preview a label, then approve it with the command it prints:");
+        writeStdout(`  ${dim(`flexops labels create --key ${response.secretKey} --from 78701 --to 97201 --weight-oz 8 --hazmat none --maximum-postage 20.00`)}`);
       } catch (err) {
         if (err instanceof GatewayError) {
           writeError(`Gateway rejected demo-key request (${describeStatus(err, cfg.json)}): ${err.message}`);

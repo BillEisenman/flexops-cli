@@ -49,7 +49,7 @@ describe("sandbox", () => {
     expect(result.stdout).not.toContain("undefined");
     expect(result.stdout).toContain(`export FLEXOPS_API_KEY=${SYNTHETIC_KEY}`);
     // labels create refuses to run without --hazmat (or --order), so the hint must include it.
-    expect(result.stdout).toContain(`flexops labels create --key ${SYNTHETIC_KEY} --from 78701 --to 97201 --weight-oz 8 --hazmat none`);
+    expect(result.stdout).toContain(`flexops labels create --key ${SYNTHETIC_KEY} --from 78701 --to 97201 --weight-oz 8 --hazmat none --maximum-postage 20.00`);
     expect(result.stdout).toContain(GATEWAY_RESPONSE.expiresAt);
   });
 

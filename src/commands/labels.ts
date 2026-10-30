@@ -76,8 +76,8 @@ export function registerLabelsCommand(program: Command): void {
   labels
     .command("create")
     .description(
-      "Preview live postage or create a sandbox label. Defaults match the homepage demo " +
-        "(USPS Priority, 78701 -> 97201); live previews require --maximum-postage."
+      "Preview a label, live or sandbox, then approve it with `labels approve`. Defaults match the " +
+        "homepage demo (USPS Priority, 78701 -> 97201); --maximum-postage is required."
     )
     .option("--key <key>", "API key (defaults to FLEXOPS_API_KEY)")
     .option("--carrier <code>", "Carrier code (USPS, UPS, FEDEX, DHL)", "USPS")
@@ -96,7 +96,7 @@ export function registerLabelsCommand(program: Command): void {
     .option("--to-city <city>", "Destination city", "Portland")
     .option("--to-state <code>", "Destination state code", "OR")
     .option("--to-country <code>", "Destination country code (ISO-2)", "US")
-    .option("--maximum-postage <usd>", "Maximum authorized postage in USD; required for live preview")
+    .option("--maximum-postage <usd>", "Maximum authorized postage in USD; required")
     .option("--weight-oz <ounces>", "Package weight in ounces", "8")
     .option("--length-in <inches>", "Package length in inches", "10")
     .option("--width-in <inches>", "Package width in inches", "6")
